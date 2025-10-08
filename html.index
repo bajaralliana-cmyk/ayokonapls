@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Recipe Yield Calculator — Limiting Ingredient</title>
+  <style>
+    :root { --bg:#f7fafc; --card:#fff; --accent:#0ea5a4; }
+    body { font-family:Inter,ui-sans-serif,system-ui; background:var(--bg); margin:0; color:#111827; }
+    .wrap { max-width:980px; margin:28px auto; padding:20px; }
+    .card { background:var(--card); border-radius:12px; padding:18px; box-shadow:0 6px 18px rgba(15,23,42,0.06); }
+    input, select, button { font-size:14px; padding:8px; border-radius:8px; border:1px solid #e5e7eb; }
+    input[type=number] { width:90px; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th, td { padding:8px; border-top:1px solid #eef2f7; text-align:left; }
+    .btn { background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; padding:6px 10px; }
+    h3 { margin-top:22px; }
+    #yieldTable td, #yieldTable th { border-top:1px solid #eef2f7; }
+    #yieldTable th { background:#f1f5f9; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Recipe Yield Calculator (Limiting Ingredient)</h2>
+      <p style="font-size:14px;color:#555;">Estimate how many complete sandwiches (or similar products) you can make from your available ingredients.</p>
+
+      <table id="table">
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Total Quantity</th>
+            <th>Unit</th>
+            <th>Portion per Product</th>
+            <th>Unit</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button id="addRow" class="btn">+ Add Ingredient</button>
+
+      <h3>Yield Summary</h3>
+      <table id="yieldTable">
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Total Qty</th>
+            <th>Portion per Product</th>
+            <th>Max Units</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <h3 id="finalOutput">You can make — sandwiches.</h3>
+    </div>
+  </div>
+
+  <script>
+    const tbody = document.querySelector('#table tbody');
+    const yieldTbody = document.querySelector('#yieldTable tbody');
+    const finalOutput = document.getElementById('finalOutput');
+    const addRowBtn = document.getElementById('addRow');
+
+    function addRow(data={}) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="name" value="${data.name||''}" placeholder="e.g. Ham" /></td>
+        <td><input type="number" class="totalQty" value="${data.totalQty||''}" /></td>
+        <td><select class="unit"><option>g</option><option>kg</option><option>ml</option><option>l</option><option>pcs</option><option>slices</option></select></td>
+        <td><input type="number" class="portion" value="${data.portion||''}" /></td>
+        <td><select class="portionUnit"><option>g</option><option>kg</option><option>ml</option><option>l</option><option>pcs</option><option>slices</option></select></td>
+        <td><button class="btn del">✕</button></td>`;
+      tbody.appendChild(tr);
+
+      const unitSel = tr.querySelector('.unit');
+      const portionUnitSel = tr.querySelector('.portionUnit');
+      unitSel.addEventListener('change', ()=>portionUnitSel.value=unitSel.value);
+      tr.querySelectorAll('input,select').forEach(el => el.addEventListener('input', computeYield));
+      tr.querySelector('.del').onclick = ()=>{ tr.remove(); computeYield(); };
+    }
+
+    function toGrams(value, unit) {
+      value = parseFloat(value) || 0;
+      if (unit === 'kg' || unit === 'l') return value * 1000;
+      return value;
+    }
+
+    function computeYield() {
+      yieldTbody.innerHTML = '';
+      const rows = tbody.querySelectorAll('tr');
+      const maxUnitsArr = [];
+
+      rows.forEach(tr => {
+        const name = tr.querySelector('.name').value || '—';
+        const totalQty = parseFloat(tr.querySelector('.totalQty').value) || 0;
+        const totalUnit = tr.querySelector('.unit').value;
+        const portion = parseFloat(tr.querySelector('.portion').value) || 0;
+        const portionUnit = tr.querySelector('.portionUnit').value;
+
+        let total = totalQty;
+        let portionVal = portion;
+
+        // convert to grams if comparable units
+        if ((totalUnit==='kg'||totalUnit==='g'||totalUnit==='l'||totalUnit==='ml') &&
+            (portionUnit==='kg'||portionUnit==='g'||portionUnit==='l'||portionUnit==='ml')) {
+          total = toGrams(totalQty,totalUnit);
+          portionVal = toGrams(portion,portionUnit);
+        }
+
+        const maxUnits = portionVal>0 ? total/portionVal : 0;
+        if (maxUnits>0) maxUnitsArr.push(maxUnits);
+
+        const trYield = document.createElement('tr');
+        trYield.innerHTML = `
+          <td>${name}</td>
+          <td>${totalQty} ${totalUnit}</td>
+          <td>${portion} ${portionUnit}</td>
+          <td>${maxUnits>0 ? maxUnits.toFixed(2) : '—'}</td>`;
+        yieldTbody.appendChild(trYield);
+      });
+
+      const finalYield = maxUnitsArr.length>0 ? Math.floor(Math.min(...maxUnitsArr)) : 0;
+      finalOutput.textContent = finalYield>0
+        ? `You can make ${finalYield} complete sandwiches (based on the limiting ingredient).`
+        : 'You can make — sandwiches.';
+    }
+
+    addRowBtn.onclick = ()=>addRow();
+    addRow();
+    computeYield();
+  </script>
+</body>
+</html>
