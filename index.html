@@ -3,132 +3,296 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Recipe Yield Calculator — Limiting Ingredient</title>
+  <title>Recipe Cost Calculator — Final</title>
   <style>
     :root { --bg:#f7fafc; --card:#fff; --accent:#0ea5a4; }
     body { font-family:Inter,ui-sans-serif,system-ui; background:var(--bg); margin:0; color:#111827; }
     .wrap { max-width:980px; margin:28px auto; padding:20px; }
     .card { background:var(--card); border-radius:12px; padding:18px; box-shadow:0 6px 18px rgba(15,23,42,0.06); }
     input, select, button { font-size:14px; padding:8px; border-radius:8px; border:1px solid #e5e7eb; }
-    input[type=number] { width:90px; }
+    input[type=number] { width:110px; }
     table { width:100%; border-collapse:collapse; margin-top:12px; }
-    th, td { padding:8px; border-top:1px solid #eef2f7; text-align:left; }
+    th, td { padding:8px; border-top:1px solid #eef2f7; text-align:center; vertical-align:middle; }
+    th { background:#f8fafc; }
     .btn { background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; padding:6px 10px; }
-    h3 { margin-top:22px; }
-    #yieldTable td, #yieldTable th { border-top:1px solid #eef2f7; }
-    #yieldTable th { background:#f1f5f9; }
+    .small { font-size:13px; padding:6px 8px; }
+    .results { margin-top:12px; text-align:left; background:#fff; padding:12px; border-radius:8px; box-shadow:0 3px 10px rgba(15,23,42,0.04); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h2>Recipe Yield Calculator (Limiting Ingredient)</h2>
-      <p style="font-size:14px;color:#555;">Estimate how many complete sandwiches (or similar products) you can make from your available ingredients.</p>
+      <h2>Recipe Cost Calculator — Final</h2>
+
+      <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; align-items:center;">
+        <input id="recipeName" placeholder="Recipe Name" style="min-width:200px" />
+        <label>Servings: <input id="servings" type="number" min="1" value="1" class="small" /></label>
+        <label>Buffer %: <input id="buffer" type="number" min="0" step="0.1" value="5" class="small" /></label>
+        <label>Markup %: <input id="markup" type="number" min="0" step="0.1" value="30" class="small" /></label>
+        <label>Food Cost %: <input id="foodCostInput" type="number" min="0" step="0.1" value="35" class="small" /></label>
+      </div>
 
       <table id="table">
         <thead>
           <tr>
             <th>Ingredient</th>
-            <th>Total Quantity</th>
-            <th>Unit</th>
-            <th>Portion per Product</th>
-            <th>Unit</th>
+            <th>Actual Weight</th>
+            <th>Unit of Measure</th>
+            <th>Unit Cost</th>
+            <th>Desired Weight</th>
+            <th>Desired Unit</th>
+            <th>Cost per Unit (₱)</th>
+            <th>Cost/Serving</th>
             <th></th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
-      <button id="addRow" class="btn">+ Add Ingredient</button>
 
-      <h3>Yield Summary</h3>
-      <table id="yieldTable">
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th>Total Qty</th>
-            <th>Portion per Product</th>
-            <th>Max Units</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <h3 id="finalOutput">You can make — sandwiches.</h3>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button id="addRow" class="btn">+ Add Ingredient</button>
+        <button id="addSample" class="btn small" style="background:#64748b">Add Sample Row</button>
+      </div>
+
+      <h3 style="margin-top:18px">Results</h3>
+      <div id="results" class="results"></div>
     </div>
   </div>
 
   <script>
-    const tbody = document.querySelector('#table tbody');
-    const yieldTbody = document.querySelector('#yieldTable tbody');
-    const finalOutput = document.getElementById('finalOutput');
+    const tbody = document.querySelector('tbody');
+    const results = document.getElementById('results');
     const addRowBtn = document.getElementById('addRow');
+    const addSampleBtn = document.getElementById('addSample');
 
-    function addRow(data={}) {
+    // --- Row creation ---
+    function addRow(data = {}) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><input class="name" value="${data.name||''}" placeholder="e.g. Ham" /></td>
-        <td><input type="number" class="totalQty" value="${data.totalQty||''}" /></td>
-        <td><select class="unit"><option>g</option><option>kg</option><option>ml</option><option>l</option><option>pcs</option><option>slices</option></select></td>
-        <td><input type="number" class="portion" value="${data.portion||''}" /></td>
-        <td><select class="portionUnit"><option>g</option><option>kg</option><option>ml</option><option>l</option><option>pcs</option><option>slices</option></select></td>
-        <td><button class="btn del">✕</button></td>`;
+        <td><input class="name" placeholder="Ingredient name" value="${data.name||''}"></td>
+        <td><input type="number" class="pkgSize" placeholder="e.g. 1000" value="${data.pkgSize||''}"></td>
+        <td>
+          <select class="pkgUnit">
+            <option>g</option><option>kg</option><option>ml</option><option>l</option><option>pcs</option>
+          </select>
+        </td>
+        <td><input type="number" class="pkgCost" placeholder="₱" value="${data.pkgCost||''}"></td>
+        <td><input type="number" class="useWeight" placeholder="e.g. 200" value="${data.useWeight||''}"></td>
+        <td>
+          <select class="useUnit">
+            <option>g</option><option>kg</option><option>ml</option><option>l</option><option>pcs</option>
+          </select>
+        </td>
+        <td class="costUnit">₱0.00</td>
+        <td class="costServe">₱0.00</td>
+        <td><button class="btn del">✕</button></td>
+      `;
       tbody.appendChild(tr);
 
-      const unitSel = tr.querySelector('.unit');
-      const portionUnitSel = tr.querySelector('.portionUnit');
-      unitSel.addEventListener('change', ()=>portionUnitSel.value=unitSel.value);
-      tr.querySelectorAll('input,select').forEach(el => el.addEventListener('input', computeYield));
-      tr.querySelector('.del').onclick = ()=>{ tr.remove(); computeYield(); };
-    }
+      // set default units if provided
+      if (data.pkgUnit) tr.querySelector('.pkgUnit').value = data.pkgUnit;
+      if (data.useUnit) tr.querySelector('.useUnit').value = data.useUnit;
 
-    function toGrams(value, unit) {
-      value = parseFloat(value) || 0;
-      if (unit === 'kg' || unit === 'l') return value * 1000;
-      return value;
-    }
+      // when package unit changes, default desired unit to match
+      const pkgUnitSel = tr.querySelector('.pkgUnit');
+      const useUnitSel = tr.querySelector('.useUnit');
+      pkgUnitSel.addEventListener('change', () => { useUnitSel.value = pkgUnitSel.value; computeAll(); });
 
-    function computeYield() {
-      yieldTbody.innerHTML = '';
-      const rows = tbody.querySelectorAll('tr');
-      const maxUnitsArr = [];
-
-      rows.forEach(tr => {
-        const name = tr.querySelector('.name').value || '—';
-        const totalQty = parseFloat(tr.querySelector('.totalQty').value) || 0;
-        const totalUnit = tr.querySelector('.unit').value;
-        const portion = parseFloat(tr.querySelector('.portion').value) || 0;
-        const portionUnit = tr.querySelector('.portionUnit').value;
-
-        let total = totalQty;
-        let portionVal = portion;
-
-        // convert to grams if comparable units
-        if ((totalUnit==='kg'||totalUnit==='g'||totalUnit==='l'||totalUnit==='ml') &&
-            (portionUnit==='kg'||portionUnit==='g'||portionUnit==='l'||portionUnit==='ml')) {
-          total = toGrams(totalQty,totalUnit);
-          portionVal = toGrams(portion,portionUnit);
-        }
-
-        const maxUnits = portionVal>0 ? total/portionVal : 0;
-        if (maxUnits>0) maxUnitsArr.push(maxUnits);
-
-        const trYield = document.createElement('tr');
-        trYield.innerHTML = `
-          <td>${name}</td>
-          <td>${totalQty} ${totalUnit}</td>
-          <td>${portion} ${portionUnit}</td>
-          <td>${maxUnits>0 ? maxUnits.toFixed(2) : '—'}</td>`;
-        yieldTbody.appendChild(trYield);
+      // listen inputs for recompute
+      tr.querySelectorAll('input,select').forEach(input => {
+        input.addEventListener('input', computeAll);
+        input.addEventListener('keydown', handleKeydown);
       });
 
-      const finalYield = maxUnitsArr.length>0 ? Math.floor(Math.min(...maxUnitsArr)) : 0;
-      finalOutput.textContent = finalYield>0
-        ? `You can make ${finalYield} complete sandwiches (based on the limiting ingredient).`
-        : 'You can make — sandwiches.';
+      // delete row
+      tr.querySelector('.del').addEventListener('click', () => { tr.remove(); computeAll(); });
+
+      // ensure navigation mapping updates
     }
 
-    addRowBtn.onclick = ()=>addRow();
-    addRow();
-    computeYield();
+    // sample row helper
+    addSampleBtn.addEventListener('click', () => {
+      addRow({ name: 'Sugar', pkgSize: 1000, pkgUnit: 'g', pkgCost: 80, useWeight: 100, useUnit: 'g' });
+      addRow({ name: 'Flour', pkgSize: 1000, pkgUnit: 'g', pkgCost: 60, useWeight: 200, useUnit: 'g' });
+      computeAll();
+    });
+
+    // convert kg/l to base (grams / ml)
+    function convertToBase(val, unit) {
+      val = parseFloat(val) || 0;
+      if (unit === 'kg' || unit === 'l') return val * 1000;
+      return val;
+    }
+
+    // compute everything
+    function computeAll() {
+      let total = 0;
+      const servings = parseFloat(document.getElementById('servings').value) || 1;
+
+      // iterate rows
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const pkgSizeRaw = tr.querySelector('.pkgSize').value;
+        const pkgUnit = tr.querySelector('.pkgUnit').value;
+        const pkgCostRaw = tr.querySelector('.pkgCost').value;
+        const useWeightRaw = tr.querySelector('.useWeight').value;
+        const useUnit = tr.querySelector('.useUnit').value;
+
+        const pkgSize = convertToBase(pkgSizeRaw, pkgUnit); // base grams/ml/pcs
+        const pkgCost = parseFloat(pkgCostRaw) || 0;
+        const useWeight = convertToBase(useWeightRaw, useUnit);
+
+        // cost per base unit (e.g., per g or per ml or per pcs)
+        const costPerBase = pkgSize > 0 ? pkgCost / pkgSize : 0;
+        const costForUse = costPerBase * useWeight;
+        const costPerServing = costForUse / servings;
+
+        // Display: Cost per Unit as clean ₱ with 2 decimals (costPerBase)
+        tr.querySelector('.costUnit').textContent = '₱' + costPerBase.toFixed(2);
+        tr.querySelector('.costServe').textContent = '₱' + costPerServing.toFixed(2);
+
+        total += costForUse;
+      });
+
+      // results summary
+      const markup = parseFloat(document.getElementById('markup').value) || 0;
+      const bufferPct = parseFloat(document.getElementById('buffer').value) || 0;
+      const desiredFoodCost = parseFloat(document.getElementById('foodCostInput').value) || 0;
+
+      const costPerBatch = total;
+      const buffer = costPerBatch * (bufferPct / 100);
+      const adjusted = costPerBatch + buffer;
+      const costPerUnit = adjusted / (parseFloat(document.getElementById('servings').value) || 1);
+
+      const sellPriceFromMarkup = costPerUnit * (1 + markup / 100);
+      const sellPriceFromFoodCost = desiredFoodCost > 0 ? costPerUnit / (desiredFoodCost / 100) : sellPriceFromMarkup;
+      const foodCostPct = sellPriceFromFoodCost > 0 ? (costPerUnit / sellPriceFromFoodCost) * 100 : 0;
+
+      // SRP formula and rounded SRP (nearest peso)
+      const srpFormula = `SRP = ${costPerUnit.toFixed(2)} × (1 + ${markup / 100})`;
+      const srpRounded = Math.round(sellPriceFromMarkup);
+
+      results.innerHTML = `
+        <p><strong>Total Cost (ingredients) per Batch:</strong> ₱${costPerBatch.toFixed(2)}</p>
+        <p><strong>Buffer (${bufferPct}%):</strong> ₱${buffer.toFixed(2)}</p>
+        <p><strong>Adjusted Total Cost:</strong> ₱${adjusted.toFixed(2)}</p>
+        <p><strong>Cost per Serving / Unit:</strong> ₱${costPerUnit.toFixed(2)}</p>
+        <p><strong>Suggested Selling Price (Markup ${markup}%):</strong> ₱${sellPriceFromMarkup.toFixed(2)}</p>
+        <p><strong>Suggested Selling Price (Target Food Cost ${desiredFoodCost}%):</strong> ₱${sellPriceFromFoodCost.toFixed(2)}</p>
+        <p><strong>Food Cost %:</strong> ${foodCostPct.toFixed(1)}%</p>
+        <hr>
+        <p><strong>${srpFormula}</strong></p>
+        <p style="font-size:18px"><strong>SRP (rounded): ₱${srpRounded}</strong></p>
+      `;
+    }
+
+    // --- Keyboard navigation helpers ---
+    function handleKeydown(e) {
+      // target must be an input/select in the table
+      const target = e.target;
+      if (!target) return;
+      const editableSelector = 'input,select';
+      const allEditable = Array.from(document.querySelectorAll('#table tbody tr'))
+        .map(r => Array.from(r.querySelectorAll(editableSelector)))
+        .filter(arr => arr.length > 0);
+
+      // find coordinates (rowIdx, colIdx)
+      let rowEl = target.closest('tr');
+      if (!rowEl) return;
+      const rowIdx = Array.from(tbody.querySelectorAll('tr')).indexOf(rowEl);
+      const rowInputs = Array.from(rowEl.querySelectorAll(editableSelector));
+      const colIdx = rowInputs.indexOf(target);
+
+      // if not within expected editable columns, ignore
+      if (colIdx === -1) return;
+
+      const numCols = rowInputs.length; // editable cols per row (should be 6)
+      const numRows = allEditable.length;
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        // move to next editable in same row, or first editable next row
+        if (colIdx + 1 < numCols) {
+          rowInputs[colIdx + 1].focus();
+        } else if (rowIdx + 1 < numRows) {
+          allEditable[rowIdx + 1][0].focus();
+        } else {
+          // at end, add new row and focus first input
+          addRow();
+          const newRow = tbody.querySelectorAll('tr')[tbody.querySelectorAll('tr').length - 1];
+          newRow.querySelectorAll(editableSelector)[0].focus();
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (colIdx - 1 >= 0) {
+          rowInputs[colIdx - 1].focus();
+        } else if (rowIdx - 1 >= 0) {
+          const prevRowInputs = allEditable[rowIdx - 1];
+          prevRowInputs[prevRowInputs.length - 1].focus();
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (rowIdx + 1 < numRows) {
+          const nextRowInputs = allEditable[rowIdx + 1];
+          // focus same column if available else last column
+          const toFocus = nextRowInputs[Math.min(colIdx, nextRowInputs.length - 1)];
+          if (toFocus) toFocus.focus();
+        } else {
+          // nothing below — optionally add a row
+          addRow();
+          const newRow = tbody.querySelectorAll('tr')[tbody.querySelectorAll('tr').length - 1];
+          const newInputs = Array.from(newRow.querySelectorAll(editableSelector));
+          newInputs[Math.min(colIdx, newInputs.length - 1)].focus();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (rowIdx - 1 >= 0) {
+          const prevRowInputs = allEditable[rowIdx - 1];
+          const toFocus = prevRowInputs[Math.min(colIdx, prevRowInputs.length - 1)];
+          if (toFocus) toFocus.focus();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        // behave like ArrowRight
+        if (colIdx + 1 < numCols) {
+          rowInputs[colIdx + 1].focus();
+        } else if (rowIdx + 1 < numRows) {
+          allEditable[rowIdx + 1][0].focus();
+        } else {
+          addRow();
+          const newRow = tbody.querySelectorAll('tr')[tbody.querySelectorAll('tr').length - 1];
+          newRow.querySelectorAll(editableSelector)[0].focus();
+        }
+      }
+    }
+
+    // wire up global controls to recompute
+    ['servings', 'markup', 'buffer', 'foodCostInput'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', computeAll);
+    });
+
+    // attach initial sample row and ensure navigation listeners exist
+    addRow(); // start with one empty row
+    computeAll();
+
+    // add buttons
+    addRowBtn.addEventListener('click', () => { addRow(); computeAll(); });
+
+    // ensure any newly added rows have keydown handlers: monitor DOM changes
+    const observer = new MutationObserver(() => {
+      // attach keydown handler to all editable cells inside table body
+      tbody.querySelectorAll('input,select').forEach(inp => {
+        // avoid duplicate listeners by replacing
+        inp.removeEventListener('keydown', handleKeydown);
+        inp.addEventListener('keydown', handleKeydown);
+      });
+      // keep computing when new inputs are created
+      computeAll();
+    });
+    observer.observe(tbody, { childList: true, subtree: true });
+
+    // recompute at intervals when typing (some browsers need it)
+    document.addEventListener('input', computeAll);
   </script>
 </body>
 </html>
